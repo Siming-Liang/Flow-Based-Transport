@@ -241,8 +241,6 @@ class EnSF:
         xt = torch.randn(ensemble_size,n_dim, device=device)
         t = 1.0
         path_all = torch.randn(ensemble_size,n_dim,time_steps, device=device)
-        total_score_save = torch.zeros(time_steps,2, device=device)   
-        cond_save = torch.zeros(time_steps, device=device)    
         # forward Euler sampling
         for i in range(time_steps):
             # prior score evaluation
@@ -255,18 +253,12 @@ class EnSF:
             temp_cov = alpha_t**2 *ens_cov + sigma2_t * torch.eye(ens_cov.size(0),device=self.device)
             prior_score = ( torch.linalg.solve(temp_cov, xt - alpha_t*x0, left=False)) 
             total_score = prior_score - tau_score * tau_scale
-            # v = xt - x0
-            # total_score_save[i,1] = like_score.sum(dim=1).mean()
-            # L = torch.linalg.cholesky(ens_cov*cov_scale)         
-            # y = torch.cholesky_solve(v.T, L).T 
-            # total_score_save[i,0] = (v * y).sum(dim=1).mean()
             xt += - dt*( self.f(t)*xt + diffuse**2 *  total_score) \
                                     + np.sqrt(dt)*diffuse*torch.randn_like(xt)
             path_all[:,:,i]=xt.squeeze(-1) + x_prior
-            cond_save[i] = torch.linalg.cond(alpha_t**2 *ens_cov*cov_scale + sigma2_t * torch.eye(ens_cov.size(0),device=self.device))
             # update time
             t = t - dt
-        return path_all, total_score_save,cond_save
+        return path_all
  
     def RSDE_inc(self, obs,x0,x_prior, time_steps,ens_cov,sparse_idx,cov_scale,tau_scale):
         sparse_index = torch.zeros(x_prior.size(dim = 1),dtype=torch.bool,device=self.device)
@@ -284,8 +276,6 @@ class EnSF:
         xt = torch.randn(ensemble_size,n_dim, device=device)
         t = 1.0
         path_all = torch.randn(ensemble_size,n_dim,time_steps, device=device)
-        total_score_save = torch.zeros(time_steps,2, device=device)   
-        cond_save = torch.zeros(time_steps, device=device)    
         # forward Euler sampling
         for i in range(time_steps):
             # prior score evaluation
@@ -298,20 +288,13 @@ class EnSF:
             temp_cov = alpha_t**2 *ens_cov + sigma2_t * torch.eye(ens_cov.size(0),device=self.device)
             prior_score = ( torch.linalg.solve(temp_cov, xt - alpha_t*x0, left=False)) 
             total_score = prior_score - tau_score * tau_scale
-            # v = xt - x0
-            # total_score_save[i,1] = like_score.sum(dim=1).mean()
-            # L = torch.linalg.cholesky(ens_cov*cov_scale)         
-            # y = torch.cholesky_solve(v.T, L).T 
-            # total_score_save[i,0] = (v * y).sum(dim=1).mean()
             xt += - dt*( self.f(t)*xt + diffuse**2 *  total_score) \
                                     + np.sqrt(dt)*diffuse*torch.randn_like(xt)
             path_all[:,:,i]=xt.squeeze(-1) + x_prior
-            cond_save[i] = torch.linalg.cond(alpha_t**2 *ens_cov*cov_scale + sigma2_t * torch.eye(ens_cov.size(0),device=self.device))
             # update time
             t = t - dt
         path_all[:,sparse_index,i] =  (path_all[:,sparse_index,i] - path_all[:,sparse_index,i].mean(dim=0))*math.sqrt(tau_scale) + path_all[:,sparse_index,i].mean(dim=0)
-        return path_all, total_score_save,cond_save
- 
+        return path_all
                 
     # damping function(tau(0) = 1;  tau(1) = 0;)
     def g_tau(self, t):
